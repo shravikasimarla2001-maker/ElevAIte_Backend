@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "career-copilot-506013",
+  "private_key_id": "7caffaf2b8e33f85fa163602552f5206539265be",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCmHy1XQFJsv0+r\nzPeT82bQy8jqtwLv+eoxdIVWGwMTHa9onBYoSvmW/XGTYLoZg78NJsA+rVOCDzNt\nQZuVQ9mDdUBzZZmPT3ys99ro98tSETna7Zw4bd2O5PRrMdyveXU8EZNKIUgbK33e\n8Zi80XjTvKze+WJ7mdKe/lzfv3gyzSeojX4+lm6PPo0CFj3NpC4j71C3PC6NqnrA\nK2Il6KY/PXY3BmSjgWWJv9lFfmILjxrq2wH98F7SkA2sKnQ2OvRNeqcuB6fw08Pt\nbtoazH3HAvmAkV0yoP5EAzZvwocVxcdUK3djtfs1x4f/ujB0+IHmlISOXJIX/kum\nWlyoFf/jAgMBAAECggEAGdzCt1G5Q1rpcWrApJUBTcJcLkZ9u5Sh5D8qvwQHj4NQ\nmq2qOW2qu9oLQ5GMh4peRRLiXR+o35e0Pu825J8ijvfDJ/QKWyhZ1afkud5SFh2+\nbxoM9zALjUKR1tp1bBAxsz9dOe5ChpBX0Uy1pbfK4tP96dzTe0CwbLZXCTKK6QWN\nLDNKKrW1idOS3kV9w+SLSG4TznutAY1EOaVT039rA9N2SrxCkknlIsu158vWnfgG\nnjOvzgsjkb56e3h4Suguapon17M88qmOwA0p/Vn+BD+F/ndF9BPVwsFLnkeVYe03\nfvnCMIU3Xgilw9VEk8rd7RTjEOQ316fPk3PyU2xFWQKBgQDcSBO8ZGyJyD2VxYyj\n64kVrcyHrpVirPMc5f4Px0uxBWBHxFHJ9DFZGErFQE9TlQWwqfOW80KGyrIM/LFp\nd44KrdMX2I8oSctteFn6r0GWPUY0EcFM8X02o1ymoAq0izFXvUmtgIpYUHZOLZNz\nYPa2QGPYZl1NIG/IOH0gSiOl3wKBgQDBDutbyI2ZA+Vfqu1pLDDYQU+dydzUU+Ak\n/7+9L1YQXjVY2Kj6xK2gSP1tqA3ANcloFwuMa0ePGFm+f2AOv/fgGDnTyOkqHvQH\nbnweqSP/mAz0c/mHIAztH47KonMOsiho9etEzK3VpdzV2QAQRvrnExaZfo2D2O4A\nrNQiKb4+fQKBgEowHDV+vO9KeTNP7SXn1atvdUrdCYLKLLa23vIBdQSRgvOossMJ\ncvVGsSftmMnVjq0JD/juxKEQ8xZcpIOYuEXwdP+697vh3plnxyYekEBBMrumnyuC\nyWD1c+bKT9CucFfUcFP2zqEfuDhsMRTSu0R2OypOj23CVuNf4wRU89yRAoGAAQEn\n3lljyzkG94F3LMXrFyT32hVTzdMF5otiHwThCMLEukqeTne5g4z9rJVkROzCuITu\nLXPdcnQo+2HESS9chdD6dAymke6JTISZprswkcLjxl3YHYjgKFeysYE44gmxRiKJ\nb9k0yljLll1Dr9H+ujcSNgg/ikEVs/EyRV88Oy0CgYEAl9k2KhQagap2ySAbLgiJ\nh8bl2/1C0/334w5uXR25s5mby8Gp+EJLIc8Vd3yAj/KvjgEGCR4UefbstJxCyYuT\nOjNhTEr1tSWsNUa5bpodNavnoEkOqseFXR+oR+fPjBlvRT9cuFFO8cwIOQ1eLVtm\n4G3EOqetC6Zxp4iQpzhNotc=\n-----END PRIVATE KEY-----\n",
+  "client_email": "career-copilot-sa@career-copilot-506013.iam.gserviceaccount.com",
+  "client_id": "112182162015444766442",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/career-copilot-sa%40career-copilot-506013.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

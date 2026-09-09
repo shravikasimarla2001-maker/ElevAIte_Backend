@@ -1,0 +1,88 @@
+# ElevAIte — Career Horizon & Upskilling Copilot
+
+A personalized, AI-driven career growth workspace for working professionals. ElevAIte continuously ingests developer profiles, runs adaptive turn-by-turn technical diagnostic interviews, and discovers vector-matched learning modules and live career opportunities.
+
+---
+
+## 🏗 System Architecture
+* **Frontend**: React 18, Vite, Tailwind CSS, Lucide React, Firebase Web SDK (v10).
+* **Backend**: Python 3.11+, FastAPI, Uvicorn, Pydantic, HTTPX.
+* **Databases**: Cloud Firestore (real-time profiles & skill matrix), Cloud SQL PostgreSQL with `pgvector` (RAG vectors).
+* **Google Cloud AI**: Gemini 1.5 Flash (diagnostic reasoning), Google Cloud Document AI (resume OCR), Cloud Text-to-Speech (audio commute digests).
+* **Storage**: Google Cloud Storage (PDF resumes).
+
+---
+
+## 📋 Prerequisites
+* Node.js v18+ and npm
+* Python 3.11+
+* Google Cloud SDK (`gcloud` CLI installed and authenticated)
+* Firebase Project with Authentication (Email/Password) and Cloud Firestore enabled.
+
+---
+
+## 🚀 Getting Started Locally
+
+### 1. Clone the Repositories
+```bash
+git clone [https://github.com/](https://github.com/)<your-org>/career-copilot.git
+git clone [https://github.com/](https://github.com/)<your-org>/copilot-frontend.git
+
+# Set your active project
+gcloud config set project <YOUR_PROJECT_ID>
+
+# Enable required Google Cloud APIs
+gcloud services enable \
+  documentai.googleapis.com \
+  storage.googleapis.com \
+  secretmanager.googleapis.com \
+  aiplatform.googleapis.com \
+  firestore.googleapis.com
+
+# Create the resume storage bucket
+gcloud storage buckets create gs://<YOUR_PROJECT_ID>-resumes --location=us-central1
+
+# Create Document AI OCR Processor
+curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{"displayName": "resume-ocr-processor", "type": "OCR_PROCESSOR"}' \
+  "[https://us-documentai.googleapis.com/v1/projects/](https://us-documentai.googleapis.com/v1/projects/)<YOUR_PROJECT_ID>/locations/us/processors"
+# Note the generated processor ID from the output.
+
+# Create BEsetup
+#1. Navigate to the backend directory and create a virtual environment:
+cd career-copilot
+python3 -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+#2. Create a .env file inside career-copilot/
+GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT_ID>
+DOCAI_LOCATION=us
+DOCAI_PROCESSOR_ID=<YOUR_DOCUMENT_AI_PROCESSOR_ID>
+GCS_RESUME_BUCKET=<YOUR_PROJECT_ID>-resumes
+
+#3. Authenticate your local environment with Application Default Credentials (ADC):
+gcloud auth application-default login
+
+#4. Start the backend:
+uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+
+# Create FEsetup
+#1. Navigate to the frontend directory:
+cd ../copilot-frontend
+npm install
+
+#2.Create a .env file in copilot-frontend/ with your Firebase project keys:
+VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_AUTH_DOMAIN=<YOUR_PROJECT>.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=<YOUR_PROJECT_ID>
+VITE_FIREBASE_STORAGE_BUCKET=<YOUR_PROJECT>.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=1:...
+
+#3. Start the Vite development server:
+npm run dev
+
+#4. Open http://localhost:3000 in your browser.
