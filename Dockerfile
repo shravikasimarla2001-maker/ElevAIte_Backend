@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 
 
 WORKDIR /app
 
@@ -24,13 +24,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 2. Copy requirements first
 COPY requirements.txt .
 
-# 3. Install Python dependencies with standard build isolation
+# 3. Install Python dependencies, forcing pip to override system-managed package conflicts
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --ignore-installed -r requirements.txt
 
 # 4. Copy application files
 COPY . .
 
-EXPOSE 8080
+ENV PORT=8080
 
-CMD ["python", "main.py"]
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT} --workers 1

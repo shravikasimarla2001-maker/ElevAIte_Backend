@@ -1,15 +1,15 @@
 import json
 import logging
 from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+# pyrefly: ignore [missing-import]
 from google.api_core.exceptions import GoogleAPICallError
 
 from app.config import db
 from app.services.document_ai import (
-    upload_pdf_to_gcs,
     extract_text_via_document_ai,
     extract_dynamic_skill_matrix,
-    delete_old_resume_from_gcs,
     recalibrate_existing_skills
 )
 
@@ -107,15 +107,7 @@ async def onboard_user(
             )
 
         try:
-            # 1. Delete previous resume from GCS if it exists
-            old_gcs_uri = existing_data.get("resume", {}).get("gcs_uri") or existing_data.get("resume_url")
-            if old_gcs_uri:
-                delete_old_resume_from_gcs(old_gcs_uri)
-
-            # 2. Upload new resume to GCS
-            new_gcs_url = upload_pdf_to_gcs(user_id, file_bytes, resume.filename)
-
-            # 3. Document AI OCR layout extraction
+            # 1. Document AI OCR layout extraction
             ocr_text = extract_text_via_document_ai(file_bytes)
 
             # 4. Generate fresh skills & dynamic domain matrix via Vertex AI
@@ -129,12 +121,10 @@ async def onboard_user(
             # 5. Completely overwrite previous resume & skills data
             update_payload["resume"] = {
                 "filename": resume.filename,
-                "gcs_uri": new_gcs_url,
                 "raw_ocr_text": ocr_text,
                 "uploaded_at": now
             }
             update_payload["resume_filename"] = resume.filename
-            update_payload["resume_url"] = new_gcs_url
             update_payload["parsed_skills"] = new_skills
             update_payload["certifications"] = new_certifications
             update_payload["years_experience"] = new_years_experience
@@ -189,8 +179,6 @@ async def onboard_user(
             update_payload["resume"] = existing_data["resume"]
         if "resume_filename" in existing_data:
             update_payload["resume_filename"] = existing_data["resume_filename"]
-        if "resume_url" in existing_data:
-            update_payload["resume_url"] = existing_data["resume_url"]
 
         update_payload["parsed_skills"] = existing_skills
         update_payload["certifications"] = existing_data.get("certifications", [])
@@ -227,8 +215,6 @@ async def onboard_user(
             update_payload["resume"] = existing_data["resume"]
         if "resume_filename" in existing_data:
             update_payload["resume_filename"] = existing_data["resume_filename"]
-        if "resume_url" in existing_data:
-            update_payload["resume_url"] = existing_data["resume_url"]
 
         update_payload["parsed_skills"] = existing_data.get("parsed_skills", [])
         update_payload["certifications"] = existing_data.get("certifications", [])

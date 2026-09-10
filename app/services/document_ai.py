@@ -3,7 +3,6 @@ import re
 import json
 import logging
 from google.cloud import documentai
-from google.cloud import storage
 from google.api_core.client_options import ClientOptions
 from google.api_core.exceptions import GoogleAPICallError
 from google import genai
@@ -13,7 +12,6 @@ from app.config import (
     PROJECT_ID,
     LOCATION,
     DOCAI_PROCESSOR_ID,
-    GCS_BUCKET_NAME,
     VERTEX_REGION
 )
 
@@ -24,8 +22,7 @@ logging.basicConfig(level=logging.INFO)
 doc_options = ClientOptions(api_endpoint=f"{LOCATION}-documentai.googleapis.com") if LOCATION else None
 docai_client = documentai.DocumentProcessorServiceClient(client_options=doc_options)
 
-# 2. Cloud Storage Client
-storage_client = storage.Client(project=PROJECT_ID)
+# 2. Cloud Storage Client removed (Resume not stored to bucket)
 
 # 3. Google GenAI Client - FORCE Vertex AI backend (Uses ADC / Service Account)
 ai_client = genai.Client(
@@ -33,40 +30,6 @@ ai_client = genai.Client(
     project=PROJECT_ID,
     location=VERTEX_REGION or "us-central1"
 )
-
-def delete_old_resume_from_gcs(gcs_uri: str) -> None:
-    """Deletes previous resume blob from Google Cloud Storage when replacing."""
-    if not gcs_uri or not gcs_uri.startswith("gs://"):
-        return
-    try:
-        # Format: gs://bucket-name/path/to/blob
-        path_parts = gcs_uri.replace("gs://", "").split("/", 1)
-        if len(path_parts) == 2:
-            bucket_name, blob_name = path_parts
-            bucket = storage_client.bucket(bucket_name)
-            blob = bucket.blob(blob_name)
-            blob.delete()
-            logger.info(f"Successfully deleted obsolete resume blob: {blob_name}")
-    except NotFound:
-        logger.warning(f"Old resume blob not found for deletion: {gcs_uri}")
-    except Exception as e:
-        logger.error(f"Failed to delete old resume from GCS ({gcs_uri}): {str(e)}")
-        
-
-def upload_pdf_to_gcs(user_id: str, file_bytes: bytes, filename: str) -> str:
-    """Persists resume to GCS. Raises RuntimeError on storage failure."""
-    try:
-        bucket = storage_client.bucket(GCS_BUCKET_NAME)
-        blob_path = f"resumes/{user_id}/{filename}"
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(file_bytes, content_type="application/pdf")
-        return f"gs://{GCS_BUCKET_NAME}/{blob_path}"
-    except GoogleAPICallError as e:
-        logger.error(f"GCS Upload Failed: {e.message} (Code: {e.code})")
-        raise RuntimeError(f"GCS bucket operation failed: {e.message}") from e
-    except Exception as e:
-        logger.error(f"Unexpected GCS storage error: {str(e)}")
-        raise RuntimeError(f"Storage service encountered an internal failure: {str(e)}") from e
 
 
 def extract_text_via_document_ai(file_bytes: bytes) -> str:

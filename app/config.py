@@ -13,7 +13,6 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", os.getenv("PROJECT_ID", "career-c
 LOCATION = os.getenv("DOCAI_LOCATION", os.getenv("LOCATION", "us"))
 VERTEX_REGION = os.getenv("VERTEX_REGION", os.getenv("REGION", "us-central1"))
 DOCAI_PROCESSOR_ID = os.getenv("DOCAI_PROCESSOR_ID", "")
-GCS_BUCKET_NAME = os.getenv("GCS_RESUME_BUCKET", f"{PROJECT_ID}-resumes")
 
 # ==========================================
 # 2. Secret Manager Dynamic Retriever
