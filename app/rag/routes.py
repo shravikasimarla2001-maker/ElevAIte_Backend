@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from google.cloud import firestore
 from app.config import db, ai_client
 from app.rag.discovery import search_google_custom
+from google.genai import types
 
 logger = logging.getLogger("rag.routes")
 router = APIRouter(prefix="/api/v1/recommendations", tags=["Recommendations & Horizon"])
@@ -60,63 +61,15 @@ Return ONLY valid JSON matching this schema:
     }
 
 
-# Accepts BOTH GET and POST to prevent 405 errors from frontend fetch/navigator calls
 @router.api_route("/radar/discover/{user_id}", methods=["GET", "POST"], status_code=status.HTTP_200_OK)
-async def discover_market_opportunities(user_id: str):
-    user_ref = db.collection("users").document(user_id)
-    user_doc = user_ref.get()
-    if not user_doc.exists:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user_data = user_doc.to_dict() or {}
-    target_prefs = user_data.get("target_preferences", [{}])
-    first_pref = target_prefs[0] if target_prefs else {}
-    target_role = first_pref.get("role", "AI Solutions Architect")
-    target_company = first_pref.get("company", "Google")
-
-    # Ingest active opportunities from search indexers
-    opportunity_queries = [
-        f"{target_company} {target_role} careers openings apply",
-        f"Google Cloud {target_role} hackathon challenge devpost 2026",
-        f"GDG Cloud meetup {target_role} community"
-    ]
-    
-    discovered_ops = []
-    for q in opportunity_queries:
-        try:
-            results = await search_google_custom(q)
-            for res in results[:1]:
-                op_type = "Job Opening" if "careers" in q else ("Hackathon" if "hackathon" in q else "Meetup")
-                discovered_ops.append({
-                    "title": res.get("title", f"{target_company} Opportunity"),
-                    "url": clean_url(res.get("url", "")),  # Cleaned markdown formatting
-                    "snippet": res.get("snippet", ""),
-                    "type": op_type,
-                    "target_company": target_company,
-                    "fit_score": 0.88 if op_type == "Job Opening" else 0.94
-                })
-        except Exception as search_err:
-            logger.error(f"Error querying custom search for '{q}': {search_err}")
-
-    # 1. Update legacy field on the root user doc
-    user_ref.update({
-        "radar_opportunities": discovered_ops
-    })
-
-    # 2. Persist to horizon_analytics/next_level_roadmap so the React snapshot listener catches it immediately
-    user_ref.collection("horizon_analytics").document("next_level_roadmap").set({
-        "opportunities": discovered_ops,
-        "last_discovered_at": firestore.SERVER_TIMESTAMP
-    }, merge=True)
-
-    return {"status": "success", "opportunities": discovered_ops}
-
-
 @router.post("/radar/discover/v2/{user_id}", status_code=status.HTTP_200_OK)
-async def get_horizon_recommendations(user_id: str):
+async def scan_and_recalibrate_radar(user_id: str) -> Dict[str, Any]:
     """
-    Evaluates verified user skills, domain proficiency, and what the user knows
-    to synthesize next-level concepts and level-calibrated opportunities.
+    Unified endpoint for Discovery and Recalibration:
+    1. Reads candidate profile (skills, domain scores, target role/level).
+    2. Uses Gemini 2.5 Flash with Google Search Grounding to find real, active opportunities.
+    3. Synthesizes tailored next-level concepts to bridge target seniority.
+    4. Stores and returns fully formed roadmap data directly matching the frontend schema.
     """
     user_ref = db.collection("users").document(user_id)
     user_doc = user_ref.get()
@@ -127,9 +80,9 @@ async def get_horizon_recommendations(user_id: str):
     target_prefs = user_data.get("target_preferences", [{}])
     first_pref = target_prefs[0] if target_prefs else {}
 
-    target_role = first_pref.get("role") or "AI Solutions Architect"
-    target_company = first_pref.get("company") or "Google"
-    target_level = first_pref.get("level") or "Senior / L5"
+    target_role = first_pref.get("role") or user_data.get("target_role") or "Software Engineer"
+    target_company = first_pref.get("company") or "Technology"
+    target_level = first_pref.get("level") or "Senior"
 
     skill_matrix = user_data.get("skill_matrix", {})
     known_skills = (
@@ -139,99 +92,106 @@ async def get_horizon_recommendations(user_id: str):
     )
 
     prompt = f"""
-Role:
-Act as an Executive Talent Architect and Principal Engineering Director at {target_company}.
-
-Context:
-The user is targeting the role "{target_role}" at target level "{target_level}".
-They currently possess verified technical skills and an evaluated domain competency matrix (rated 1 to 10).
+Role: You are an Executive Tech Career Architect and Recruiter.
 
 Candidate Telemetry:
-- All Verified/Known Skills: {json.dumps(known_skills)}
-- Evaluated Domain Competency Matrix: {json.dumps(skill_matrix)}
+- Known/Verified Skills: {json.dumps(known_skills)}
+- Competency Matrix (Skill -> Score/10): {json.dumps(skill_matrix)}
 - Target Role: {target_role}
-- Target Company: {target_company}
-- Target Level: {target_level}
+- Target Seniority Level: {target_level}
+- Target Company/Ecosystem: {target_company}
 
-Task:
-1. Detailed Knowledge & Domain Breakdown:
-   - For EACH domain present in the competency matrix (or general core domains if empty):
-     a) "what_user_knows": Specific tools, frameworks, and patterns they already have verified.
-     b) "current_proficiency": Integer 1-10.
-     c) "target_proficiency": Integer (e.g., 8-10).
-     d) "target_concept": The exact production-grade architectural concept to master next.
-     e) "why_next_level": Architectural justification for {target_level}.
-     f) "implementation_blueprint": Practical engineering steps or configuration notes.
-2. Level-Calibrated Opportunity Matching:
-   - Generate 3-4 realistic opportunities matching their current experience trajectory:
-     a) "title", "company", "level".
-     b) "match_percentage" (50 to 95%).
-     c) "compensation_range".
-     d) "unlocked_by": Array of skills they already possess qualifying them.
-     e) "blocking_gaps": Concrete technical topics preventing clearance.
-     f) "strategic_advice": Actionable priority advice.
+Your Goals:
+1. "next_level_concepts":
+   - For 2 to 4 technical domains in the candidate's matrix (especially where score < 8), identify:
+     * domain: name of the domain.
+     * current_proficiency: user's assessed score (1-10).
+     * target_proficiency: 8-10.
+     * what_user_knows: list of specific tools/patterns the candidate already commands.
+     * target_concept: the exact enterprise production pattern required to bridge to {target_level}.
+     * why_next_level: architectural justification.
+     * implementation_blueprint: concise configuration/engineering steps.
 
-Constraints:
-- Return ONLY a valid JSON object matching the schema below.
-- Do NOT output markdown fences or commentary outside the JSON.
+2. "opportunities":
+   - Search the live web for 3 to 4 REAL career opportunities, active postings, enterprise hackathons, or ecosystem challenges matching {target_role} / {target_company}.
+   - Do NOT invent fake URLs or placeholders. Find actual links (Careers portals, Devpost, LinkedIn, official tech blogs).
+   - Each opportunity must contain:
+     * title: Job opening or challenge name.
+     * company: Hiring company or hosting organization.
+     * level: e.g. "L3", "Senior", "Hackathon", "Open Bounty".
+     * match_percentage: Integer (55 to 95) calculated from their skills vs requirements.
+     * compensation_range: Salary range or prize pool (e.g. "$160,000 - $210,000" or "$25,000 in Prizes").
+     * unlocked_by: List of actual skills the candidate has that qualify them for this.
+     * blocking_gaps: List of specific technical gaps they must master.
+     * strategic_advice: High-signal advice on how to pass screening or submit a winning project.
+     * url: Direct link to the listing or announcement.
 
-Schema:
+Return ONLY a valid JSON object matching this structure:
 {{
   "next_level_concepts": [
     {{
-      "domain": "Database & Vector Storage",
-      "current_proficiency": 3,
+      "domain": "...",
+      "current_proficiency": 4,
       "target_proficiency": 8,
-      "what_user_knows": ["PostgreSQL", "Basic Vector Extensions"],
-      "target_concept": "HNSW vs IVFFlat Partitioning & Quantization in Large-Scale pgvector",
-      "why_next_level": "Eliminates unindexed sequential scan bottlenecks; mandatory for sub-15ms vector retrieval across millions of dimensions.",
-      "implementation_blueprint": "Transition from flat vector scans to HNSW with m=16, ef_construction=64; configure maintenance_work_mem."
+      "what_user_knows": ["..."],
+      "target_concept": "...",
+      "why_next_level": "...",
+      "implementation_blueprint": "..."
     }}
   ],
   "opportunities": [
     {{
-      "title": "Senior AI Solutions Architect",
-      "company": "{target_company}",
-      "level": "{target_level}",
-      "match_percentage": 84,
-      "compensation_range": "$185,000 - $245,000",
-      "unlocked_by": ["FastAPI", "Cloud Run Containerization"],
-      "blocking_gaps": ["pgvector High-Scale Partitioning", "Document AI Custom Extractor Fine-Tuning"],
-      "strategic_advice": "Clear the vector database gap this sprint to qualify for technical screening rounds."
+      "title": "...",
+      "company": "...",
+      "level": "...",
+      "match_percentage": 82,
+      "compensation_range": "...",
+      "unlocked_by": ["..."],
+      "blocking_gaps": ["..."],
+      "strategic_advice": "...",
+      "url": "..."
     }}
   ]
 }}
 """
+
+    payload = {"next_level_concepts": [], "opportunities": []}
+
     try:
         if ai_client:
+            # Google Search tool grounding ensures genuine URLs and realistic listings
             response = await ai_client.aio.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt,
-                config={"response_mime_type": "application/json", "temperature": 0.1}
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.2,
+                    tools=[{"google_search": {}}],  # Enables web search grounding
+                ),
             )
-            payload = json.loads(response.text)
-        else:
-            payload = {"next_level_concepts": [], "opportunities": []}
-    except Exception as err:
-        logger.error(f"Failed to generate level concepts & opportunities: {err}")
-        payload = {"next_level_concepts": [], "opportunities": []}
+            raw_text = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            payload = json.loads(raw_text)
+    except Exception as exc:
+        logger.error(f"Radar generation failed for user {user_id}: {exc}", exc_info=True)
 
-    # Persist generated suggestions to Firestore
-    user_ref.collection("horizon_analytics").document("next_level_roadmap").set({
-        "next_level_concepts": payload.get("next_level_concepts", []),
-        "opportunities": payload.get("opportunities", []),
+    # Clean empty lists/keys if Gemini failed or partially returned
+    concepts = payload.get("next_level_concepts", [])
+    opportunities = payload.get("opportunities", [])
+
+    # Persist directly into the Firestore doc that OpportunityRadarScreen listens to
+    roadmap_doc_ref = user_ref.collection("horizon_analytics").document("next_level_roadmap")
+    roadmap_doc_ref.set({
+        "next_level_concepts": concepts,
+        "opportunities": opportunities,
         "target_role": target_role,
         "target_level": target_level,
-        "generated_at": firestore.SERVER_TIMESTAMP
+        "updated_at": firestore.SERVER_TIMESTAMP,
     }, merge=True)
 
     return {
         "status": "success",
-        "user_id": user_id,
-        "target_role": target_role,
-        "target_level": target_level,
-        "next_level_concepts": payload.get("next_level_concepts", []),
-        "opportunities": payload.get("opportunities", [])
+        "next_level_concepts": concepts,
+        "opportunities": opportunities,
     }
 
 
