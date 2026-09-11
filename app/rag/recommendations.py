@@ -6,14 +6,7 @@ from google.cloud import firestore
 from app.config import ai_client, db
 
 logger = logging.getLogger("rag.recommendations")
-import json
-import logging
-from typing import List, Dict, Any
-from google.genai import types
-from google.cloud import firestore
-from app.config import ai_client, db
 
-logger = logging.getLogger("rag.recommendations")
 
 async def generate_level_based_concepts_and_opportunities(
     user_id: str,

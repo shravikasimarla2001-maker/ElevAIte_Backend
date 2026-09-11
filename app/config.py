@@ -9,10 +9,13 @@ from google import genai
 # ==========================================
 # 1. Non-Sensitive Infrastructure Configs
 # ==========================================
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", os.getenv("PROJECT_ID", "career-copilot-506013"))
-LOCATION = os.getenv("DOCAI_LOCATION", os.getenv("LOCATION", "us"))
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+DOCAI_PROJECT_ID = os.getenv("DOCAI_PROJECT_ID", "")
+LOCATION = os.getenv("DOCAI_LOCATION", "us")
 VERTEX_REGION = os.getenv("VERTEX_REGION", os.getenv("REGION", "us-central1"))
 DOCAI_PROCESSOR_ID = os.getenv("DOCAI_PROCESSOR_ID", "")
+GCS_BUCKET_NAME = os.getenv("GCS_RESUME_BUCKET", f"{PROJECT_ID}-resumes")
+
 
 # ==========================================
 # 2. Secret Manager Dynamic Retriever
@@ -41,7 +44,7 @@ def get_secret(secret_id: str, version_id: str = "latest") -> str:
 # 3. Dynamic Credential Retrieval
 # ==========================================
 # Fetches from Secret Manager (falls back to local env variable if running offline)
-GEMINI_API_KEY = get_secret("gemini-api-key")
+GEMINI_API_KEY = get_secret("gemini-api-key") or os.getenv("GEMINI_API_KEY")
 
 # ==========================================
 # 4. Service Clients Initialization

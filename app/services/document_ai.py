@@ -3,6 +3,7 @@ import re
 import json
 import logging
 from google.cloud import documentai
+from google.cloud import storage
 from google.api_core.client_options import ClientOptions
 from google.api_core.exceptions import GoogleAPICallError
 from google import genai
@@ -10,49 +11,112 @@ from google.genai import types
 
 from app.config import (
     PROJECT_ID,
+    DOCAI_PROJECT_ID,
     LOCATION,
     DOCAI_PROCESSOR_ID,
-    VERTEX_REGION
+    VERTEX_REGION,
+    GCS_BUCKET_NAME
 )
 
-logger = logging.getLogger("ingestion.document_ai")
+logger = logging.getLogger("services.document_ai")
 logging.basicConfig(level=logging.INFO)
 
+
 # 1. Document AI Client
+# doc_options = ClientOptions(api_endpoint=f"{LOCATION}-documentai.googleapis.com") if LOCATION else None
+# docai_client = documentai.DocumentProcessorServiceClient(client_options=doc_options)
 doc_options = ClientOptions(api_endpoint=f"{LOCATION}-documentai.googleapis.com") if LOCATION else None
 docai_client = documentai.DocumentProcessorServiceClient(client_options=doc_options)
 
-# 2. Cloud Storage Client removed (Resume not stored to bucket)
+# 2. Cloud Storage Client
+storage_client = storage.Client(project=PROJECT_ID)
+
 
 # 3. Google GenAI Client - FORCE Vertex AI backend (Uses ADC / Service Account)
 ai_client = genai.Client(
     vertexai=True,
     project=PROJECT_ID,
-    location=VERTEX_REGION or "us-central1"
+    location=VERTEX_REGION
 )
 
 
-def extract_text_via_document_ai(file_bytes: bytes) -> str:
-    """Performs OCR layout text parsing via Document AI."""
+def delete_old_resume_from_gcs(gcs_uri: str) -> None:
+    """Deletes previous resume blob from Google Cloud Storage when replacing."""
+    if not gcs_uri or not gcs_uri.startswith("gs://"):
+        return
+    try:
+        # Format: gs://bucket-name/path/to/blob
+        path_parts = gcs_uri.replace("gs://", "").split("/", 1)
+        if len(path_parts) == 2:
+            bucket_name, blob_name = path_parts
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            blob.delete()
+            logger.info(f"Successfully deleted obsolete resume blob: {blob_name}")
+    except NotFound:
+        logger.warning(f"Old resume blob not found for deletion: {gcs_uri}")
+    except Exception as e:
+        logger.error(f"Failed to delete old resume from GCS ({gcs_uri}): {str(e)}")
+
+
+def upload_pdf_to_gcs(user_id: str, file_bytes: bytes, filename: str) -> str:
+    """Persists resume to GCS. Raises RuntimeError on storage failure."""
+    try:
+        bucket = storage_client.bucket(GCS_BUCKET_NAME)
+        blob_path = f"resumes/{user_id}/{filename}"
+        blob = bucket.blob(blob_path)
+        blob.upload_from_string(file_bytes, content_type="application/pdf")
+        return f"gs://{GCS_BUCKET_NAME}/{blob_path}"
+    except GoogleAPICallError as e:
+        logger.error(f"GCS Upload Failed: {e.message} (Code: {e.code})")
+        raise RuntimeError(f"GCS bucket operation failed: {e.message}") from e
+    except Exception as e:
+        logger.error(f"Unexpected GCS storage error: {str(e)}")
+        raise RuntimeError(f"Storage service encountered an internal failure: {str(e)}") from e
+ 
+def extract_text_via_document_ai(file_bytes: bytes = None, file_name: str = "", uri: str = "") -> str:
+    """Performs OCR layout text parsing via Document AI using either bytes or a GCS URI."""
     if not DOCAI_PROCESSOR_ID:
         raise ValueError("DOCAI_PROCESSOR_ID is missing or not set in backend configuration.")
 
     try:
-        resource_name = docai_client.processor_path(PROJECT_ID, LOCATION, DOCAI_PROCESSOR_ID)
-        raw_document = documentai.RawDocument(content=file_bytes, mime_type="application/pdf")
-        request = documentai.ProcessRequest(name=resource_name, raw_document=raw_document)
+        # 1. Derive the fully-qualified processor resource identifier
+        resource_name = docai_client.processor_path(DOCAI_PROJECT_ID, LOCATION, DOCAI_PROCESSOR_ID)
+        logger.info(f"resource_name: {resource_name}")
 
+        # 2. Choose input source: GCS URI (if provided) or In-memory file_bytes
+        if uri:
+            # For files stored in a Google Cloud Storage bucket
+            gcs_document = documentai.GcsDocument(gcs_uri=uri, mime_type="application/pdf")
+            request = documentai.ProcessRequest(
+                name=resource_name,
+                gcs_document=gcs_document
+            )
+            logger.info(f"Executing Document AI process request using GCS URI: {uri}")
+        elif file_bytes:
+            # For files passed directly as raw in-memory bytes
+            raw_document = documentai.RawDocument(content=file_bytes, mime_type="application/pdf")
+            request = documentai.ProcessRequest(
+                name=resource_name,
+                raw_document=raw_document
+            )
+            logger.info("Executing Document AI process request using raw bytes...")
+        else:
+            raise ValueError("Either file_bytes or a valid GCS uri must be provided.")
+
+        # 3. Process document
         result = docai_client.process_document(request=request)
         extracted_text = result.document.text
+        logger.info(f"Successfully extracted {len(extracted_text)} characters via Document AI.")
 
         if not extracted_text or not extracted_text.strip():
-            raise ValueError("Document AI processed the PDF, but no textual characters were detected.")
+            raise ValueError("Document AI processed the document, but no textual characters were detected.")
 
         return extracted_text
+
     except GoogleAPICallError as e:
         logger.error(f"Document AI Process Error: {e.message}")
         raise RuntimeError(f"Document AI OCR call failed: {e.message}") from e
-
 
 def _clean_and_parse_json(raw_text: str) -> dict:
     """Strict JSON parser that cleans markdown backticks."""
