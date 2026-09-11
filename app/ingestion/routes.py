@@ -120,7 +120,6 @@ async def onboard_user(
             # 3. Document AI OCR layout extraction
             ocr_text = extract_text_via_document_ai(file_bytes, resume.filename, new_gcs_url)
 
-            logger.info(f"ocr_text: {ocr_text}")
             extracted_data = await extract_dynamic_skill_matrix(ocr_text, target_role)
 
             new_skills = extracted_data.get("parsed_skills", [])
@@ -177,7 +176,6 @@ async def onboard_user(
     # CASE 2: NO NEW RESUME, BUT TARGET ROLE WAS UPDATED (Recalibrate skills)
     # =========================================================================
     elif target_changed:
-        logger.info(f"Target role changed from '{old_target_role}' to '{target_role}'. Recalibrating...")
         existing_skills = existing_data.get("parsed_skills", [])
         existing_matrix = existing_data.get("skill_matrix", {})
 

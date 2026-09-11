@@ -15,7 +15,8 @@ from app.config import (
     LOCATION,
     DOCAI_PROCESSOR_ID,
     VERTEX_REGION,
-    GCS_BUCKET_NAME
+    GCS_BUCKET_NAME, 
+    ai_client
 )
 
 logger = logging.getLogger("services.document_ai")
@@ -30,14 +31,6 @@ docai_client = documentai.DocumentProcessorServiceClient(client_options=doc_opti
 
 # 2. Cloud Storage Client
 storage_client = storage.Client(project=PROJECT_ID)
-
-
-# 3. Google GenAI Client - FORCE Vertex AI backend (Uses ADC / Service Account)
-ai_client = genai.Client(
-    vertexai=True,
-    project=PROJECT_ID,
-    location=VERTEX_REGION
-)
 
 
 def delete_old_resume_from_gcs(gcs_uri: str) -> None:

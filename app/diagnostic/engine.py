@@ -3,7 +3,7 @@ import re
 from app.config import ai_client
 
 # Explicit model ID as required by Google GenAI
-MODEL_ID = "gemini-3.6-flash"
+MODEL_ID = "gemini-2.5-flash"
 
 
 def clean_json_response(raw_text: str) -> dict:
@@ -17,7 +17,7 @@ def clean_json_response(raw_text: str) -> dict:
 def generate_first_question(target_role: str, resume_context: str, skill_matrix: dict) -> dict:
     """Generates real-time Question #1 using Gemini 3.6 Flash."""
     if not ai_client:
-        raise ValueError("GEMINI_API_KEY environment variable is missing or invalid.")
+        raise ValueError("AI client creation failed.")
 
     prompt = f"""
     You are an expert technical interviewer assessing a candidate for: {target_role}.
@@ -45,7 +45,7 @@ def evaluate_and_generate_next(
 ) -> dict:
     """Evaluates answer, scores it (1-10), and generates Question N+1."""
     if not ai_client:
-        raise ValueError("GEMINI_API_KEY environment variable is missing or invalid.")
+        raise ValueError("AI client creation failed.")
 
     prompt = f"""
     You are an expert technical interviewer assessing a candidate for: {target_role}.

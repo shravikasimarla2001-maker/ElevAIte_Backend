@@ -17,6 +17,15 @@ DOCAI_PROCESSOR_ID = os.getenv("DOCAI_PROCESSOR_ID", "")
 GCS_BUCKET_NAME = os.getenv("GCS_RESUME_BUCKET", f"{PROJECT_ID}-resumes")
 
 
+db = firestore.Client(project=PROJECT_ID)
+
+# Google GenAI Client - FORCE Vertex AI backend (Uses ADC / Service Account)
+ai_client = genai.Client(
+    vertexai=True,
+    project=PROJECT_ID,
+    location=VERTEX_REGION
+)
+
 # ==========================================
 # 2. Secret Manager Dynamic Retriever
 # ==========================================
@@ -46,25 +55,20 @@ def get_secret(secret_id: str, version_id: str = "latest") -> str:
 # Fetches from Secret Manager (falls back to local env variable if running offline)
 GEMINI_API_KEY = get_secret("gemini-api-key") or os.getenv("GEMINI_API_KEY")
 
-# ==========================================
-# 4. Service Clients Initialization
-# ==========================================
-# Initialize shared Firestore Client using Application Default Credentials
-db = firestore.Client(project=PROJECT_ID)
 
-# Initialize Google GenAI Client with the retrieved key
-if GEMINI_API_KEY:
-    ai_client = genai.Client(api_key=GEMINI_API_KEY)
-else:
-    print("\n⚠️ WARNING: GEMINI_API_KEY not found in Secret Manager or Environment.\n")
-    # Fallback to Application Default Credentials
-    ai_client = genai.Client()
+# # Initialize Google GenAI Client with the retrieved key
+# if GEMINI_API_KEY:
+#     ai_client = genai.Client(api_key=GEMINI_API_KEY)
+# else:
+#     print("\n⚠️ WARNING: GEMINI_API_KEY not found in Secret Manager or Environment.\n")
+#     # Fallback to Application Default Credentials
+#     ai_client = genai.Client()
 
 
-# Initialize Vertex AI SDK
-try:
-    vertexai.init(project=PROJECT_ID, location=VERTEX_REGION)
-    llm_model = GenerativeModel("gemini-2.5-flash")
-except Exception as e:
-    print(f"Vertex AI initialization notice: {e}")
-    llm_model = None
+# # Initialize Vertex AI SDK
+# try:
+#     vertexai.init(project=PROJECT_ID, location=VERTEX_REGION)
+#     llm_model = GenerativeModel("gemini-2.5-flash")
+# except Exception as e:
+#     print(f"Vertex AI initialization notice: {e}")
+#     llm_model = None

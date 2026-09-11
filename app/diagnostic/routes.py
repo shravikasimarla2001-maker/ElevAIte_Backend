@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, Form, HTTPException, status
 from google.cloud import firestore
-from app.config import db, llm_model
+from app.config import db
 from app.diagnostic.engine import generate_first_question, evaluate_and_generate_next
 
 router = APIRouter(prefix="/api/v1/diagnostic", tags=["Diagnostic Interview"])
