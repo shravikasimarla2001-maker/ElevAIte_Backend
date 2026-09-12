@@ -75,7 +75,6 @@ def extract_text_via_document_ai(file_bytes: bytes = None, file_name: str = "", 
     try:
         # 1. Derive the fully-qualified processor resource identifier
         resource_name = docai_client.processor_path(DOCAI_PROJECT_ID, LOCATION, DOCAI_PROCESSOR_ID)
-        logger.info(f"resource_name: {resource_name}")
 
         # 2. Choose input source: GCS URI (if provided) or In-memory file_bytes
         if uri:
@@ -258,6 +257,7 @@ Current Matrix to Recalibrate:
             )
         )
         data = _clean_and_parse_json(response.text)
+        logger.info(f"data:  {data}")
         return data.get("dynamic_matrix", {})
     except Exception as e:
         logger.error(f"Vertex AI skill recalibration failed: {str(e)}")

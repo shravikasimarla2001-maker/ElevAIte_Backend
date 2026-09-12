@@ -15,6 +15,8 @@ LOCATION = os.getenv("DOCAI_LOCATION", "us")
 VERTEX_REGION = os.getenv("VERTEX_REGION", os.getenv("REGION", "us-central1"))
 DOCAI_PROCESSOR_ID = os.getenv("DOCAI_PROCESSOR_ID", "")
 GCS_BUCKET_NAME = os.getenv("GCS_RESUME_BUCKET", f"{PROJECT_ID}-resumes")
+YOUTUBE_API_KEY = os.getenv("Youtube_API", "")
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 
 db = firestore.Client(project=PROJECT_ID)
@@ -53,7 +55,7 @@ def get_secret(secret_id: str, version_id: str = "latest") -> str:
 # 3. Dynamic Credential Retrieval
 # ==========================================
 # Fetches from Secret Manager (falls back to local env variable if running offline)
-GEMINI_API_KEY = get_secret("gemini-api-key") or os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = get_secret("gemini-api-key") or GEMINI_API_KEY
 
 
 # # Initialize Google GenAI Client with the retrieved key
